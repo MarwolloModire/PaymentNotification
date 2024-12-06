@@ -1,3 +1,3 @@
 {
-	"cSpell.words": ["dotenv", "dropna", "iloc", "isin", "iterrows", "loguru"]
+	"cSpell.words": ["asyncpg", "dayfirst", "dotenv", "dropna", "iloc", "isin", "iterrows", "loguru"]
 }
