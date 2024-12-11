@@ -127,12 +127,16 @@ async def process_tables(pool, table1: pd.DataFrame, table2: pd.DataFrame):
                 contractor_name = client
                 manager_name = author
 
-                # Проверяем, существует ли уже запись с таким payment_date и payment_number
+                # Проверяем, существует ли уже запись с такими payment_date, payment_number и contractor_name
                 async with pool.acquire() as conn:
                     async with conn.transaction():
                         result = await conn.fetch(
-                            "SELECT 1 FROM orders WHERE payment_date = $1 AND payment_number = $2",
-                            payment_date, payment_number
+                            """
+                            SELECT 1 
+                            FROM orders 
+                            WHERE payment_date = $1 AND payment_number = $2 AND contractor_name = $3
+                            """,
+                            payment_date, payment_number, contractor_name
                         )
                         if result:
                             continue  # Запись уже существует, пропускаем её
