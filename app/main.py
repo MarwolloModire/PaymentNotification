@@ -36,6 +36,10 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 author_ids = pd.read_csv("author_ids.csv")  # Таблица Author, TelegramID
 author_dict = dict(zip(author_ids["Author"], author_ids["TelegramID"]))
 
+BOSS_ID = author_dict.get("Пашковский Денис Юзэфович")
+if not BOSS_ID:
+    logger.error("ID начальника не найден в author_dict")
+
 
 # Настраиваем подключение к базе данных
 async def get_db_pool():
@@ -234,6 +238,26 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     except Exception as e:
                         logger.error(
                             f"Ошибка при отправке сообщения автору {author}: {e}")
+
+                # Подготовка сообщений для начальника
+                boss_messages = []
+                for author, message_text in messages:
+                    boss_messages.append(f"Сообщение отправлено автору {author}: {message_text}")  # noqa
+                if unmatched:
+                    boss_messages.append("🚨 НЕ РАСПОЗНАННЫЕ ОПЛАТЫ 🚨")
+                    boss_messages.extend(unmatched)
+
+                # Отправляем сообщения начальнику
+                if boss_messages:
+                    try:
+                        await context.bot.send_message(
+                            chat_id=BOSS_ID,
+                            text="\n\n".join(boss_messages)
+                        )
+                        logger.info("Сообщения успешно отправлены начальнику.")
+                    except Exception as e:
+                        logger.error(
+                            f"Ошибка при отправке сообщений начальнику: {e}")
 
                 # Отправляем сообщения для нераспознанных оплат
                 if unmatched:
