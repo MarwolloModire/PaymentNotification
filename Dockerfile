@@ -1,24 +1,17 @@
 # Используем официальный образ Python
 FROM python:3.12-slim
 
-# Устанавливаем зависимости системы
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libpq-dev \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Устанавливаем рабочую директорию
+# Устанавливаем рабочую директорию внутри контейнера
 WORKDIR /app
 
-# Копируем только необходимые файлы
-COPY app/requirements.txt /app/
+# Копируем зависимости (только requirements.txt) для кеширования слоев
+COPY requirements.txt .
 
-# Устанавливаем зависимости Python
+# Устанавливаем зависимости
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Копируем код приложения
-COPY app/ /app/
+# Копируем исходный код приложения в контейнер
+COPY . .
 
 # Указываем команду запуска
-ENTRYPOINT ["python"]
-CMD ["main.py"]
+CMD ["python", "app/main.py"]

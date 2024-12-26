@@ -2,6 +2,7 @@ import pandas as pd
 import re
 from io import BytesIO
 import os
+from datetime import datetime
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -15,13 +16,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 LOG_DIR = BASE_DIR / "logs"
 
 
-# Убедимся, что папка logs существует
-LOG_DIR.mkdir(exist_ok=True)
+# Получаем текущую дату
+today = datetime.now().strftime('%Y-%m-%d')
+
+# Создаем папку для логов на локальной машине
+DAILY_LOG_DIR = LOG_DIR / today
+DAILY_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # Настройка Loguru для логирования с ротацией
 logger.add(
-    LOG_DIR / "{time:YYYY-MM-DD}.log",
+    DAILY_LOG_DIR / "{time:YYYY-MM-DD}.log",
     rotation="3 weeks",
     retention="3 weeks",
     compression="zip"
@@ -99,7 +104,7 @@ def extract_account_number_2(text: str) -> str:
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()  # Очистка состояния
-    await update.message.reply_text("Пришлите первую таблицу (XLS или HTML).")
+    await update.message.reply_text("Пришлите первую таблицу с оплатами (XLS или HTML).")
 
 
 async def process_tables(pool, table1: pd.DataFrame, table2: pd.DataFrame):
@@ -208,7 +213,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     table1 = pd.read_excel(file_bytes)
 
                 context.user_data["table1"] = table1
-                await update.message.reply_text("Первая таблица сохранена. Пришлите вторую таблицу.")
+                await update.message.reply_text("Первая таблица сохранена. Пришлите вторую таблицу (Выписку из 1с).")
             except Exception as e:
                 await update.message.reply_text(f"Ошибка при загрузке первой таблицы: {e}")
                 return
@@ -247,14 +252,25 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     boss_messages.append("🚨 НЕ РАСПОЗНАННЫЕ ОПЛАТЫ 🚨")
                     boss_messages.extend(unmatched)
 
-                # Отправляем сообщения начальнику
-                if boss_messages:
+                # Отправка сообщений начальнику по отдельности
+                if messages or unmatched:
                     try:
-                        await context.bot.send_message(
-                            chat_id=BOSS_ID,
-                            text="\n\n".join(boss_messages)
-                        )
-                        logger.info("Сообщения успешно отправлены начальнику.")
+                        # Обрабатываем каждое сообщение из списка messages
+                        for author, message_text in messages:
+                            formatted_message = f"Сообщение отправлено автору {author}: {message_text} \n"
+                            await context.bot.send_message(chat_id=BOSS_ID, text=formatted_message)
+
+                        # Если есть нераспознанные оплаты, уведомляем начальника
+                        if unmatched:
+                            await context.bot.send_message(
+                                chat_id=BOSS_ID,
+                                text="🚨 НЕ РАСПОЗНАННЫЕ ОПЛАТЫ 🚨"
+                            )
+                            for unmatched_message in unmatched:
+                                await context.bot.send_message(chat_id=BOSS_ID, text=unmatched_message)
+
+                        logger.info(
+                            "Все сообщения успешно отправлены начальнику.")
                     except Exception as e:
                         logger.error(
                             f"Ошибка при отправке сообщений начальнику: {e}")
